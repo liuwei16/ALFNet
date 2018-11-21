@@ -12,7 +12,7 @@ cimport numpy as np
 DTYPE = np.float
 ctypedef np.float_t DTYPE_t
 
-def bbox_overlaps(
+def box_op(
         np.ndarray[DTYPE_t, ndim=2] boxes,
         np.ndarray[DTYPE_t, ndim=2] query_boxes):
     """
@@ -28,7 +28,6 @@ def bbox_overlaps(
     cdef unsigned int K = query_boxes.shape[0]
     cdef np.ndarray[DTYPE_t, ndim=2] overlaps = np.zeros((N, K), dtype=DTYPE)
     cdef DTYPE_t iw, ih, box_area
-    cdef DTYPE_t ua
     cdef unsigned int k, n
     for k in range(K):
         box_area = (
@@ -46,10 +45,5 @@ def bbox_overlaps(
                     max(boxes[n, 1], query_boxes[k, 1]) + 1
                 )
                 if ih > 0:
-                    ua = float(
-                        (boxes[n, 2] - boxes[n, 0] + 1) *
-                        (boxes[n, 3] - boxes[n, 1] + 1) +
-                        box_area - iw * ih
-                    )
-                    overlaps[n, k] = iw * ih / ua
+                    overlaps[n, k] = iw * ih / box_area
     return overlaps

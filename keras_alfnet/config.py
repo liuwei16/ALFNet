@@ -2,17 +2,16 @@
 class Config:
 
 	def __init__(self):
-		self.gpu_ids = '2'
-		self.onegpu = 4
-		self.num_epochs = 100
+		self.gpu_ids = '0,1'
+		self.onegpu = 10
+		self.num_epochs = 150
 		self.add_epoch = 0
 		self.iter_per_epoch = 2000
 		self.init_lr = 1e-4
 
 		# setting for network architechture
-		# self.network = 'resnet50' # or 'mobilenet'
-		self.network = 'mobilenet' # or 'mobilenet'
-		self.steps = 1  # optionally, ALF steps can be 1,2,3,...
+		self.network = 'resnet50' # or 'mobilenet'
+		self.steps = 2  # optionally, ALF steps can be 1,2,3,...
 
 		# setting for data augmentation
 		self.use_horizontal_flips = True

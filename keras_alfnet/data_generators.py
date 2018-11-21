@@ -6,6 +6,9 @@ import random
 from . import data_augment
 from .utils.cython_bbox import bbox_overlaps
 from .utils.bbox import box_op
+# from .utils2.cython_bbox import bbox_overlaps
+# from .utils2.bbox import box_op
+
 from .bbox_transform import *
 import matplotlib.pyplot as plt
 
@@ -154,6 +157,64 @@ def calc_target_multilayer(C, img_data, anchors, igthre=0.5, posthre=0.5, negthr
 
 	return y_alf_cls, y_alf_regr
 
+def calc_target_multilayer_posfirst(C, img_data, anchors, igthre=0.5, posthre=0.5, negthre=0.3):
+	all_anchors = np.copy(anchors)
+	num_bboxes = len(img_data['bboxes'])
+	gta = np.copy(img_data['bboxes'])
+	ignoreareas = img_data['ignoreareas']
+
+	# initialise empty output objectives
+	y_alf_overlap = np.zeros((all_anchors.shape[0], 1))
+	y_alf_negindex = np.zeros((all_anchors.shape[0], 1))
+	y_is_box_valid = np.ones((all_anchors.shape[0], 1))
+	y_alf_regr = np.zeros((all_anchors.shape[0], 4))
+
+	if num_bboxes>0:
+		valid_overlap = bbox_overlaps(np.ascontiguousarray(all_anchors, dtype=np.float),
+									  np.ascontiguousarray(gta, dtype=np.float))
+		# find every anchor close to which bbox
+		argmax_overlaps = valid_overlap.argmax(axis=1)
+		max_overlaps = valid_overlap[np.arange(len(all_anchors)), argmax_overlaps]
+		# find which anchor closest to every bbox
+		gt_argmax_overlaps = valid_overlap.argmax(axis=0)
+		gt_max_overlaps = valid_overlap[gt_argmax_overlaps, np.arange(num_bboxes)]
+		gt_argmax_overlaps = np.where(valid_overlap == gt_max_overlaps)[0]
+		y_alf_overlap[gt_argmax_overlaps] = 1
+		y_alf_overlap[max_overlaps>=posthre] = 1
+		for i in range(len(gta)):
+			inds = valid_overlap[:,i].ravel().argsort()[-3:]
+			y_alf_overlap[inds] = 1
+		# get positives labels
+		fg_inds = np.where(y_alf_overlap == 1)[0]
+		anchor_box = all_anchors[fg_inds,:4]
+		gt_box = gta[argmax_overlaps[fg_inds], :]
+
+		# compute regression targets
+		y_alf_regr[fg_inds, :] = compute_targets(anchor_box, gt_box, C.classifier_regr_std, std=True)
+		bg_inds = np.where(max_overlaps < negthre)[0]
+		y_alf_negindex[bg_inds] = 1
+		# find the invalid anchors
+		if len(ignoreareas) > 0:
+			ignore_overlap = box_op(np.ascontiguousarray(all_anchors[:, :4], dtype=np.float),
+									np.ascontiguousarray(ignoreareas, dtype=np.float))
+			ignore_sum = np.sum(ignore_overlap, axis=1)
+			y_is_box_valid[ignore_sum > igthre] = 0
+			y_alf_negindex = (np.logical_and(y_alf_negindex, y_is_box_valid)).astype(np.float)
+	else:
+		y_alf_negindex = np.ones((all_anchors.shape[0], 1))
+		if len(ignoreareas) > 0:
+			ignore_overlap = box_op(np.ascontiguousarray(all_anchors[:, :4], dtype=np.float),
+									np.ascontiguousarray(ignoreareas, dtype=np.float))
+			ignore_sum = np.sum(ignore_overlap, axis=1)
+			y_is_box_valid[ignore_sum > igthre] = 0
+			y_alf_negindex = (np.logical_and(y_alf_negindex, y_is_box_valid)).astype(np.float)
+
+	y_alf_cls = np.expand_dims(np.concatenate([y_alf_overlap, y_alf_negindex], axis=1) ,axis=0)
+	y_alf_regr = np.expand_dims(np.concatenate([y_alf_overlap, y_alf_regr], axis=1) ,axis=0)
+
+	return y_alf_cls, y_alf_regr
+
+
 def get_target(anchors, all_img_data, C,batchsize = 8, net='2step', igthre=0.5,posthre=0.5, negthre=0.3):
 	current = 0
 	while True:
@@ -164,7 +225,8 @@ def get_target(anchors, all_img_data, C,batchsize = 8, net='2step', igthre=0.5,p
 		for img_data in all_img_data[current:current+batchsize]:
 			try:
 				img_data, x_img = data_augment.augment(img_data, C, augment=True)
-				y_cls, y_regr = calc_target_multilayer(C, img_data, anchors,igthre=igthre, posthre=posthre, negthre=negthre)
+				# y_cls, y_regr = calc_target_multilayer(C, img_data, anchors,igthre=igthre, posthre=posthre, negthre=negthre)
+				y_cls, y_regr = calc_target_multilayer_posfirst(C, img_data, anchors,igthre=igthre, posthre=posthre, negthre=negthre)
 				x_img = x_img.astype(np.float32)
 				x_img[:, :, 0] -= C.img_channel_mean[0]
 				x_img[:, :, 1] -= C.img_channel_mean[1]
