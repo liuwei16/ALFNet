@@ -70,9 +70,13 @@ Optionally, you should set the training parameters in [./keras_alfnet/config.py]
  
  Follow the [./train.py](https://github.com/liuwei16/ALFNet/blob/master/train.py) to start training. You can modify the parameter 'self.steps' in [./keras_alfnet/config.py](https://github.com/liuwei16/ALFNet/blob/master/keras_alfnet/config.py) for different ALF steps. By default, the output weight files will be saved in '$ALFNet/output/valmodels/(network)/(num of)steps'.
 
-Update: Train with the strategy of weight moving average (WMA)
-Optionally, we provide an example of training ALFNet-2s with WMA [./train_2step_wma.py](https://github.com/liuwei16/ALFNet/blob/master/train_2step_wma.py) 
-WMA is firstly proposed in [Mean-Teacher](https://arxiv.org/abs/1703.01780). We find that WMA is helpful to achieve more stable results and one trial is given in [./results_2step_wma.txt](https://github.com/liuwei16/ALFNet/blob/master/results_2step_wma.txt) 
+3. Update: Train with the strategy of weight moving average (WMA)
+
+ Optionally, we provide an example of training ALFNet-2s with WMA ([./train_2step_wma.py](https://github.com/liuwei16/ALFNet/blob/master/train_2step_wma.py))
+
+ WMA is firstly proposed in [Mean-Teacher](https://arxiv.org/abs/1703.01780). 
+
+ We find that WMA is helpful to achieve more stable results and one trial is given in [./results_2step_wma.txt](https://github.com/liuwei16/ALFNet/blob/master/results_2step_wma.txt) 
 
 ### Test
 Follow the [./test.py](https://github.com/liuwei16/ALFNet/blob/master/test.py) to get the detection results. By default, the output .txt files will be saved in '$ALFNet/output/valresults/(network)/(num of)steps'.
