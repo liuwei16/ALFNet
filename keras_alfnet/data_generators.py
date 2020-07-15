@@ -97,10 +97,11 @@ def get_anchors(img_width,img_height, feat_map_sizes,anchor_box_scales,anchor_ra
 		ancs.append(all_anchors)
 	return np.concatenate(ancs,axis=0), num_anchors
 
+#calc_target for Visible-part Estimation
 def calc_target_multilayer(C, img_data, anchors, igthre=0.5, posthre=0.5, negthre=0.3):
 	all_anchors = np.copy(anchors)
-	num_bboxes = len(img_data['bboxes'])
-	gta = np.copy(img_data['bboxes'])
+	num_bboxes = len(img_data['vis_bboxes'])
+	gta = np.copy(img_data['vis_bboxes'])
 	ignoreareas = img_data['ignoreareas']
 
 	# calculate the valid anchors (without thoses in the ignore areas and outside the image)
@@ -133,6 +134,7 @@ def calc_target_multilayer(C, img_data, anchors, igthre=0.5, posthre=0.5, negthr
 		gt_argmax_overlaps = np.where(valid_overlap == gt_max_overlaps)[0]
 		valid_alf_overlap[gt_argmax_overlaps] = 1
 		valid_alf_overlap[max_overlaps>=posthre] = 1
+		
 		for i in range(len(gta)):
 			inds = valid_overlap[:,i].ravel().argsort()[-3:]
 			valid_alf_overlap[inds] = 1
@@ -152,70 +154,13 @@ def calc_target_multilayer(C, img_data, anchors, igthre=0.5, posthre=0.5, negthr
 		y_is_box_valid[valid_idxs, :] = valid_is_box_valid
 		y_alf_regr[valid_idxs, :] = valid_alf_regr
 		y_alf_negindex = y_is_box_valid-y_alf_overlap
+   
 	y_alf_cls = np.expand_dims(np.concatenate([y_alf_overlap, y_alf_negindex], axis=1) ,axis=0)
 	y_alf_regr = np.expand_dims(np.concatenate([y_alf_overlap, y_alf_regr], axis=1) ,axis=0)
 
 	return y_alf_cls, y_alf_regr
 
-def calc_target_multilayer_posfirst(C, img_data, anchors, igthre=0.5, posthre=0.5, negthre=0.3):
-	all_anchors = np.copy(anchors)
-	num_bboxes = len(img_data['bboxes'])
-	gta = np.copy(img_data['bboxes'])
-	ignoreareas = img_data['ignoreareas']
-
-	# initialise empty output objectives
-	y_alf_overlap = np.zeros((all_anchors.shape[0], 1))
-	y_alf_negindex = np.zeros((all_anchors.shape[0], 1))
-	y_is_box_valid = np.ones((all_anchors.shape[0], 1))
-	y_alf_regr = np.zeros((all_anchors.shape[0], 4))
-
-	if num_bboxes>0:
-		valid_overlap = bbox_overlaps(np.ascontiguousarray(all_anchors, dtype=np.float),
-									  np.ascontiguousarray(gta, dtype=np.float))
-		# find every anchor close to which bbox
-		argmax_overlaps = valid_overlap.argmax(axis=1)
-		max_overlaps = valid_overlap[np.arange(len(all_anchors)), argmax_overlaps]
-		# find which anchor closest to every bbox
-		gt_argmax_overlaps = valid_overlap.argmax(axis=0)
-		gt_max_overlaps = valid_overlap[gt_argmax_overlaps, np.arange(num_bboxes)]
-		gt_argmax_overlaps = np.where(valid_overlap == gt_max_overlaps)[0]
-		y_alf_overlap[gt_argmax_overlaps] = 1
-		y_alf_overlap[max_overlaps>=posthre] = 1
-		for i in range(len(gta)):
-			inds = valid_overlap[:,i].ravel().argsort()[-3:]
-			y_alf_overlap[inds] = 1
-		# get positives labels
-		fg_inds = np.where(y_alf_overlap == 1)[0]
-		anchor_box = all_anchors[fg_inds,:4]
-		gt_box = gta[argmax_overlaps[fg_inds], :]
-
-		# compute regression targets
-		y_alf_regr[fg_inds, :] = compute_targets(anchor_box, gt_box, C.classifier_regr_std, std=True)
-		bg_inds = np.where(max_overlaps < negthre)[0]
-		y_alf_negindex[bg_inds] = 1
-		# find the invalid anchors
-		if len(ignoreareas) > 0:
-			ignore_overlap = box_op(np.ascontiguousarray(all_anchors[:, :4], dtype=np.float),
-									np.ascontiguousarray(ignoreareas, dtype=np.float))
-			ignore_sum = np.sum(ignore_overlap, axis=1)
-			y_is_box_valid[ignore_sum > igthre] = 0
-			y_alf_negindex = (np.logical_and(y_alf_negindex, y_is_box_valid)).astype(np.float)
-	else:
-		y_alf_negindex = np.ones((all_anchors.shape[0], 1))
-		if len(ignoreareas) > 0:
-			ignore_overlap = box_op(np.ascontiguousarray(all_anchors[:, :4], dtype=np.float),
-									np.ascontiguousarray(ignoreareas, dtype=np.float))
-			ignore_sum = np.sum(ignore_overlap, axis=1)
-			y_is_box_valid[ignore_sum > igthre] = 0
-			y_alf_negindex = (np.logical_and(y_alf_negindex, y_is_box_valid)).astype(np.float)
-
-	y_alf_cls = np.expand_dims(np.concatenate([y_alf_overlap, y_alf_negindex], axis=1) ,axis=0)
-	y_alf_regr = np.expand_dims(np.concatenate([y_alf_overlap, y_alf_regr], axis=1) ,axis=0)
-
-	return y_alf_cls, y_alf_regr
-
-
-def get_target(anchors, all_img_data, C,batchsize = 8, net='2step', igthre=0.5,posthre=0.5, negthre=0.3):
+def get_target(anchors, all_img_data, C,batchsize = 8, igthre=0.5,posthre=0.5, negthre=0.3):
 	current = 0
 	while True:
 		x_img_batch, y_cls_batch, y_regr_batch, img_data_batch = [], [], [] ,[]
@@ -224,9 +169,8 @@ def get_target(anchors, all_img_data, C,batchsize = 8, net='2step', igthre=0.5,p
 			current = 0
 		for img_data in all_img_data[current:current+batchsize]:
 			try:
-				img_data, x_img = data_augment.augment(img_data, C, augment=True)
-				# y_cls, y_regr = calc_target_multilayer(C, img_data, anchors,igthre=igthre, posthre=posthre, negthre=negthre)
-				y_cls, y_regr = calc_target_multilayer_posfirst(C, img_data, anchors,igthre=igthre, posthre=posthre, negthre=negthre)
+				img_data, x_img = data_augment.augment(img_data, C)
+				y_cls, y_regr = calc_target_multilayer(C, img_data, anchors,igthre=igthre, posthre=posthre, negthre=negthre)
 				x_img = x_img.astype(np.float32)
 				x_img[:, :, 0] -= C.img_channel_mean[0]
 				x_img[:, :, 1] -= C.img_channel_mean[1]
@@ -243,8 +187,6 @@ def get_target(anchors, all_img_data, C,batchsize = 8, net='2step', igthre=0.5,p
 		y_cls_batch = np.concatenate(np.array(y_cls_batch), axis=0)
 		y_regr_batch = np.concatenate(np.array(y_regr_batch), axis=0)
 		current += batchsize
-		if net=='2step':
-			yield np.copy(x_img_batch), [np.copy(y_cls_batch), np.copy(y_regr_batch)], np.copy(img_data_batch)
-		else:
-			yield np.copy(x_img_batch), [np.copy(y_cls_batch), np.copy(y_regr_batch)]
+
+		yield np.copy(x_img_batch), [np.copy(y_cls_batch), np.copy(y_regr_batch)], np.copy(img_data_batch)
 
