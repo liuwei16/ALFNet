@@ -2,23 +2,20 @@
 class Config:
 
 	def __init__(self):
-		self.gpu_ids = '0,1'
-		self.onegpu = 10
-		self.num_epochs = 150
+		self.gpu_ids = '0,2'
+		self.onegpu = 4
+		self.num_epochs = 100
 		self.add_epoch = 0
 		self.iter_per_epoch = 2000
 		self.init_lr = 1e-4
-
-		# setting for network architechture
-		self.network = 'resnet50' # or 'mobilenet'
-		self.steps = 2  # optionally, ALF steps can be 1,2,3,...
 
 		# setting for data augmentation
 		self.use_horizontal_flips = True
 		self.brightness = (0.5, 2, 0.5)
 		self.in_thre = 0.5
 		self.scale = (0.3, 1.0)
-		self.random_crop = (640, 1280)
+		self.random_crop = (1024, 2048)
+		self.size_train = (1024, 2048)
 
 		# image channel-wise mean to subtract, the order is BGR
 		self.img_channel_mean = [103.939, 116.779, 123.68]
@@ -32,17 +29,15 @@ class Config:
 
 		# overlaps for ignore areas
 		self.ig_overlap = 0.5
-		# overlaps for different ALF steps
-		self.neg_overlap_step1 = 0.3
-		self.pos_overlap_step1 = 0.5
-		self.neg_overlap_step2 = 0.4
-		self.pos_overlap_step2 = 0.65
-		self.neg_overlap_step3 = 0.5
-		self.pos_overlap_step3 = 0.75
+		# labeling stratety threshold
+		self.neg_overlap_ve = 0.3
+		self.pos_overlap_ve = 0.5
+		self.neg_overlap_fr = 0.5
+		self.pos_overlap_fr = 0.7
 
 		# setting for inference
-		self.scorethre= 0.1
-		self.overlap_thresh = 0.5
+		self.scorethre= 0.05
+		self.overlap_thresh = 0.5 #threshold in nms stage
 		self.pre_nms_topN = 6000
 		self.post_nms_topN = 100
 		self.roi_stride= 16
