@@ -9,7 +9,7 @@ from evaluation.eval_script.eval_MR_multisetup import COCOeval
 C = config.Config()
 os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 epoch=82
-w_path="/data/models/PRNet_city.hdf5"
+w_path="./data/models/PRNet_city.hdf5"
 
 # define output path for detection results
 out_path = 'output/valresults/prnet'
