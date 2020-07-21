@@ -1,9 +1,6 @@
 # Progressive Refinement Network for Occluded Pedestrian Detection
 Keras implementation of PRNet accepted in ECCV 2020. 
 
-## Introduction
-This paper presents Progressive Refinement Network (PRNet), a novel single-stage detector that tackles occluded pedestrian detection. Motivated by human¡¯s progressive process on annotating occluded pedestrians, PRNet achieves sequential refinement by three phases: Finding high confident anchors of visible parts, calibrating such anchors to a full-body template based on occlusion statistics, and then predicting final full-body regions from the calibrated anchors. For more details, please refer to our paper.
-
 ### Dependencies
 
 * python 2.7
