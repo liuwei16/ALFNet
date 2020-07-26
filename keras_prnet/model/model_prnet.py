@@ -132,7 +132,7 @@ class Model_prnet(Base_model):
 		res_file = os.path.join(out_path, 'val_det_epoch%s.json')%(epoch)
 		for f in range(len(val_data)):
 			filepath = val_data[f]['filepath']
-			print('{}/50'.format(f))
+			print('{}/500'.format(f))
 			frame_number = f + 1
 			img = cv2.imread(filepath)
 			#start_time = time.time()
