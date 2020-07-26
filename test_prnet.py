@@ -38,8 +38,8 @@ model.test_model(model_config, model_epoch, val_data, model_path, output_path)
 ann_type = 'bbox'
 ann_file = 'evaluation/val_gt.json'
 dt_path = os.path.join(output_path)
-res_file = os.path.join(dt_path, 'val_det_epoch%s.json' % epoch)
-summary_file = open(os.path.join(dt_path, 'results_epoch%s.txt' % epoch), 'w')
+res_file = os.path.join(dt_path, 'val_det_epoch%s.json' % model_epoch)
+summary_file = open(os.path.join(dt_path, 'results_epoch%s.txt' % model_epoch), 'w')
 for id_setup in range(0, 4):
     cocoGt = COCO(ann_file)
     cocoDt = cocoGt.loadRes(res_file)
