@@ -76,7 +76,6 @@ class COCOeval:
         self.params = Params(iouType=iouType) # parameters
         self._paramsEval = {}               # parameters for evaluation
         self.stats = []                     # result summarization
-        self.ious = {}                      # ious between all gts and dts
         if not cocoGt is None:
             self.params.imgIds = sorted(cocoGt.getImgIds())
             self.params.catIds = sorted(cocoGt.getCatIds())
@@ -117,13 +116,13 @@ class COCOeval:
         :return: None
         '''
         tic = time.time()
-        # print('Running per image evaluation...')
+        print('Running per image evaluation...')
         p = self.params
         # add backward compatibility if useSegm is specified in params
         if not p.useSegm is None:
             p.iouType = 'segm' if p.useSegm == 1 else 'bbox'
             print('useSegm (deprecated) is not None. Running {} evaluation'.format(p.iouType))
-        # print('Evaluate annotation type *{}*'.format(p.iouType))
+        print('Evaluate annotation type *{}*'.format(p.iouType))
         p.imgIds = list(np.unique(p.imgIds))
         if p.useCats:
             p.catIds = list(np.unique(p.catIds))
@@ -133,12 +132,6 @@ class COCOeval:
         self._prepare(id_setup)
         # loop through images, area range, max detection number
         catIds = p.catIds if p.useCats else [-1]
-
-        computeIoU = self.computeIoU
-
-        self.ious = {(imgId, catId): computeIoU(imgId, catId) \
-                        for imgId in p.imgIds
-                        for catId in catIds}
 
         evaluateImg = self.evaluateImg
         maxDet = p.maxDets[-1]
@@ -150,17 +143,11 @@ class COCOeval:
              ]
         self._paramsEval = copy.deepcopy(self.params)
         toc = time.time()
-        # print('DONE (t={:0.2f}s).'.format(toc-tic))
+        print('DONE (t={:0.2f}s).'.format(toc-tic))
 
 
-    def computeIoU(self, imgId, catId):
+    def computeIoU(self, gt, dt):
         p = self.params
-        if p.useCats:
-            gt = self._gts[imgId,catId]
-            dt = self._dts[imgId,catId]
-        else:
-            gt = [_ for cId in p.catIds for _ in self._gts[imgId,cId]]
-            dt = [_ for cId in p.catIds for _ in self._dts[imgId,cId]]
         if len(gt) == 0 and len(dt) ==0:
             return []
         inds = np.argsort([-d['score'] for d in dt], kind='mergesort')
@@ -217,13 +204,13 @@ class COCOeval:
                 ious[i, j] = float(t)/unionarea
         return ious
 
+
+
     def evaluateImg(self, imgId, catId, hRng, vRng, maxDet):
         '''
         perform evaluation for single category and image
         :return: dict (single image results)
         '''
-        # if imgId==273:
-        #     pass
         p = self.params
         if p.useCats:
             gt = self._gts[imgId,catId]
@@ -243,18 +230,14 @@ class COCOeval:
         gtind = np.argsort([g['_ignore'] for g in gt], kind='mergesort')
         gt = [gt[i] for i in gtind]
         dtind = np.argsort([-d['score'] for d in dt], kind='mergesort')
-        # dtind = np.argsort([-d['score'] for d in dt])
         dt = [dt[i] for i in dtind[0:maxDet]]
         # exclude dt out of height range
         dt = [d for d in dt if d['height'] >= hRng[0] / self.params.expFilter and d['height'] < hRng[1] * self.params.expFilter]
         dtind = np.array([int(d['id'] - dt[0]['id']) for d in dt])
-        # if np.max(dtind)>1000:
-        #     pass
 
         # load computed ious
         if len(dtind) > 0:
-            ious = self.ious[imgId, catId][dtind, :] if len(self.ious[imgId, catId]) > 0 else self.ious[imgId, catId]
-            ious = ious[:, gtind]
+            ious = self.computeIoU(gt,dt)
         else:
             ious = []
 
@@ -322,7 +305,7 @@ class COCOeval:
         :param p: input params for evaluation
         :return: None
         '''
-        # print('Accumulating evaluation results...')
+        print('Accumulating evaluation results...')
         tic = time.time()
         if not self.evalImgs:
             print('Please run evaluate() first')
@@ -410,7 +393,7 @@ class COCOeval:
             'TP':   ys,
         }
         toc = time.time()
-        # print('DONE (t={:0.2f}s).'.format( toc-tic))
+        print('DONE (t={:0.2f}s).'.format( toc-tic))
 
     def summarize(self,id_setup, res_file):
         '''
@@ -445,8 +428,7 @@ class COCOeval:
                 mean_s = np.mean(mean_s)
                 mean_s = np.exp(mean_s)
             print(iStr.format(titleStr, typeStr,setupStr, iouStr, heightStr, occlStr, mean_s*100))
-            # res_file.write(iStr.format(titleStr, typeStr,setupStr, iouStr, heightStr, occlStr, mean_s*100))
-            res_file.write(str(mean_s * 100))
+            res_file.write(iStr.format(titleStr, typeStr,setupStr, iouStr, heightStr, occlStr, mean_s*100))
             res_file.write('\n')
             return mean_s
 
@@ -474,17 +456,9 @@ class Params:
 
         self.iouThrs = np.array([0.5])  # np.linspace(.5, 0.95, np.round((0.95 - .5) / .05) + 1, endpoint=True)
 
-        # self.HtRng = [[50, 1e5 ** 2], [50,75], [50, 1e5 ** 2], [20, 1e5 ** 2]]
-        # self.VisRng = [[0.65, 1e5 ** 2], [0.65, 1e5 ** 2], [0.2,0.65], [0.2, 1e5 ** 2]]
-        # self.SetupLbl = ['Reasonable', 'Reasonable_small','Reasonable_occ=heavy', 'All']
-
-        self.HtRng = [[50, 1e5 ** 2], [50, 75], [75, 100], [100, 1e5 ** 2]]
-        self.VisRng = [[0.65, 1e5 ** 2], [0.65, 1e5 ** 2], [0.65, 1e5 ** 2], [0.65, 1e5 ** 2]]
-        self.SetupLbl = ['Reasonable', 'small', 'middle', 'large']
-
-        # self.HtRng = [[50, 1e5 ** 2], [50, 1e5 ** 2], [50, 1e5 ** 2], [50, 1e5 ** 2]]
-        # self.VisRng = [[0.65, 1e5 ** 2], [0.9, 1e5 ** 2], [0.65, 0.9], [0, 0.65]]
-        # self.SetupLbl = ['Reasonable', 'bare', 'partial', 'heavy']
+        self.HtRng = [[50, 1e5 ** 2], [50,75], [50, 1e5 ** 2], [50, 1e5 ** 2]]
+        self.VisRng = [[0.65, 1e5 ** 2], [0.65, 1e5 ** 2], [0.2,0.65], [0.2, 1e5 ** 2]]
+        self.SetupLbl = ['Reasonable', 'Reasonable_small','Reasonable_occ=heavy', 'All']
 
 
     def __init__(self, iouType='segm'):
